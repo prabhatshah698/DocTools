@@ -32,11 +32,15 @@ export const metadata: Metadata = {
 
   authors: [{ name: "DocTools" }],
 
+  verification: {
+    google: "tZHnvI13wUubxPIoQ-CzxdOHzZ9ozwzoO-lxnd3D8tM",
+  },
+
   openGraph: {
     title: "Document Tools Hub",
     description:
       "All-in-one free online document tools. Convert, compress, and generate files instantly.",
-    url: "https://your-domain.com",
+    url: "https://doc-tools-frontend.vercel.app",
     siteName: "DocTools",
     type: "website",
   },

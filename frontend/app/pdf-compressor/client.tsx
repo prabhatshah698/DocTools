@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export default function PdfCompressor() {
   const [file, setFile] = useState<File | null>(null);
@@ -54,6 +55,16 @@ export default function PdfCompressor() {
         <p className="text-center text-gray-500 mt-2 text-sm">
           Reduce PDF size instantly without losing quality
         </p>
+
+        {/* Navigation */}
+        <div className="text-center mt-3">
+          <Link
+            href="/"
+            className="text-sm text-blue-600 hover:underline"
+          >
+            ← Go to Home
+          </Link>
+        </div>
 
         {/* Upload Box */}
         <div className="mt-6 border-2 border-dashed border-blue-300 rounded-xl p-6 text-center bg-blue-50 hover:bg-blue-100 transition">
