@@ -11,6 +11,8 @@ import qrcode
 
 import os
 import uuid
+import time
+from threading import Thread
 
 app = FastAPI()
 
@@ -22,7 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------- Folders ----------------
+# ---------------- FOLDERS ----------------
 UPLOAD_DIR = "uploads"
 PDF_DIR = "pdfs"
 DOCX_DIR = "docx"
@@ -32,13 +34,48 @@ QR_DIR = "qr_codes"
 for folder in [UPLOAD_DIR, PDF_DIR, DOCX_DIR, PPTX_DIR, QR_DIR]:
     os.makedirs(folder, exist_ok=True)
 
+# ---------------- TTL (30 min) ----------------
+FILE_TTL = 30 * 60  # 30 minutes
+
+
+# ---------------- CLEANUP FUNCTION ----------------
+def cleanup_files():
+    while True:
+        now = time.time()
+
+        folders = [UPLOAD_DIR, PDF_DIR, DOCX_DIR, PPTX_DIR, QR_DIR]
+
+        for folder in folders:
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+
+                if os.path.isfile(file_path):
+                    file_age = now - os.path.getmtime(file_path)
+
+                    if file_age > FILE_TTL:
+                        try:
+                            os.remove(file_path)
+                            print("Deleted:", file_path)
+                        except Exception as e:
+                            print("Delete error:", e)
+
+        time.sleep(300)  # check every 5 minutes
+
+
+@app.on_event("startup")
+def start_cleanup():
+    thread = Thread(target=cleanup_files, daemon=True)
+    thread.start()
+
+
 # ---------------- ROOT ----------------
 @app.get("/")
 def home():
     return {"message": "Backend running 🚀"}
 
+
 # =====================================================
-# WORD → PDF (FIXED FOR RENDER)
+# WORD → PDF
 # =====================================================
 @app.post("/word-to-pdf/")
 async def word_to_pdf(file: UploadFile = File(...)):
@@ -50,7 +87,6 @@ async def word_to_pdf(file: UploadFile = File(...)):
     input_path = os.path.join(UPLOAD_DIR, f"{file_id}.docx")
     output_path = os.path.join(PDF_DIR, f"{file_id}.pdf")
 
-    # Save file
     with open(input_path, "wb") as f:
         f.write(await file.read())
 
@@ -75,14 +111,12 @@ async def word_to_pdf(file: UploadFile = File(...)):
 
     return FileResponse(output_path, filename="output.pdf")
 
+
 # =====================================================
 # PDF → WORD
 # =====================================================
 @app.post("/pdf-to-word/")
 async def pdf_to_word(file: UploadFile = File(...)):
-
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(400, "Only PDF allowed")
 
     file_id = str(uuid.uuid4())
     input_path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
@@ -106,6 +140,7 @@ async def pdf_to_word(file: UploadFile = File(...)):
         raise HTTPException(500, f"PDF → Word error: {str(e)}")
 
     return FileResponse(output_path, filename="output.docx")
+
 
 # =====================================================
 # PDF → PPT
@@ -143,6 +178,7 @@ async def pdf_to_ppt(file: UploadFile = File(...)):
 
     return FileResponse(output_path, filename="output.pptx")
 
+
 # =====================================================
 # WORD → PPT
 # =====================================================
@@ -172,6 +208,7 @@ async def word_to_ppt(file: UploadFile = File(...)):
         raise HTTPException(500, f"Word → PPT error: {str(e)}")
 
     return FileResponse(output_path, filename="output.pptx")
+
 
 # =====================================================
 # PPT → WORD
@@ -203,8 +240,9 @@ async def ppt_to_word(file: UploadFile = File(...)):
 
     return FileResponse(output_path, filename="output.docx")
 
+
 # =====================================================
-# QR CODE
+# QR CODE GENERATOR
 # =====================================================
 @app.post("/generate-qr/")
 async def generate_qr(data: str = Form(...)):
