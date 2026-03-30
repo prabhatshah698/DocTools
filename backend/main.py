@@ -3,12 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from docx import Document
+from reportlab.pdfgen import canvas
 import pdfplumber
 from pptx import Presentation
 from pptx.util import Inches, Pt
-
-import os, uuid, subprocess
 import qrcode
+
+import os
+import uuid
 
 app = FastAPI()
 
@@ -17,7 +19,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 # ---------------- Folders ----------------
@@ -36,22 +38,7 @@ def home():
     return {"message": "Backend running 🚀"}
 
 # =====================================================
-# ⚡ COMMON FUNCTION (LibreOffice FAST)
-# =====================================================
-def libre_convert(input_path, output_dir):
-    result = subprocess.run([
-        r"C:\Program Files\LibreOffice\program\soffice.exe",
-        "--headless",
-        "--convert-to", "pdf",
-        input_path,
-        "--outdir", output_dir
-    ], capture_output=True, text=True)
-
-    if result.returncode != 0:
-        raise Exception(result.stderr)
-
-# =====================================================
-# WORD → PDF
+# WORD → PDF (FIXED FOR RENDER)
 # =====================================================
 @app.post("/word-to-pdf/")
 async def word_to_pdf(file: UploadFile = File(...)):
@@ -60,47 +47,33 @@ async def word_to_pdf(file: UploadFile = File(...)):
         raise HTTPException(400, "Only DOCX allowed")
 
     file_id = str(uuid.uuid4())
-    input_path = os.path.abspath(os.path.join(UPLOAD_DIR, f"{file_id}.docx"))
-    output_file = os.path.abspath(os.path.join(PDF_DIR, f"{file_id}.pdf"))
+    input_path = os.path.join(UPLOAD_DIR, f"{file_id}.docx")
+    output_path = os.path.join(PDF_DIR, f"{file_id}.pdf")
 
+    # Save file
     with open(input_path, "wb") as f:
         f.write(await file.read())
 
     try:
-        libre_convert(input_path, PDF_DIR)
+        doc = Document(input_path)
+        text = "\n".join([p.text for p in doc.paragraphs])
+
+        c = canvas.Canvas(output_path)
+        y = 800
+
+        for line in text.split("\n"):
+            c.drawString(50, y, line[:100])
+            y -= 20
+            if y < 50:
+                c.showPage()
+                y = 800
+
+        c.save()
+
     except Exception as e:
-        raise HTTPException(500, f"Conversion error: {e}")
+        raise HTTPException(500, f"Conversion error: {str(e)}")
 
-    if not os.path.exists(output_file):
-        raise HTTPException(500, "PDF not generated")
-
-    return FileResponse(output_file, filename="output.pdf")
-
-# =====================================================
-# PPT → PDF
-# =====================================================
-@app.post("/ppt-to-pdf/")
-async def ppt_to_pdf(file: UploadFile = File(...)):
-
-    if not file.filename.endswith(".pptx"):
-        raise HTTPException(400, "Only PPTX allowed")
-
-    file_id = str(uuid.uuid4())
-    input_path = os.path.abspath(os.path.join(UPLOAD_DIR, f"{file_id}.pptx"))
-    output_file = os.path.abspath(os.path.join(PDF_DIR, f"{file_id}.pdf"))
-
-    with open(input_path, "wb") as f:
-        f.write(await file.read())
-
-    try:
-        libre_convert(input_path, PDF_DIR)
-    except Exception as e:
-        raise HTTPException(500, f"PPT → PDF error: {e}")
-
-    if not os.path.exists(output_file):
-        raise HTTPException(500, "PDF not generated")
-
-    return FileResponse(output_file, filename="output.pdf")
+    return FileResponse(output_path, filename="output.pdf")
 
 # =====================================================
 # PDF → WORD
@@ -130,7 +103,7 @@ async def pdf_to_word(file: UploadFile = File(...)):
         doc.save(output_path)
 
     except Exception as e:
-        raise HTTPException(500, f"PDF → Word error: {e}")
+        raise HTTPException(500, f"PDF → Word error: {str(e)}")
 
     return FileResponse(output_path, filename="output.docx")
 
@@ -166,7 +139,7 @@ async def pdf_to_ppt(file: UploadFile = File(...)):
         prs.save(output_path)
 
     except Exception as e:
-        raise HTTPException(500, f"PDF → PPT error: {e}")
+        raise HTTPException(500, f"PDF → PPT error: {str(e)}")
 
     return FileResponse(output_path, filename="output.pptx")
 
@@ -196,7 +169,7 @@ async def word_to_ppt(file: UploadFile = File(...)):
         prs.save(output_path)
 
     except Exception as e:
-        raise HTTPException(500, f"Word → PPT error: {e}")
+        raise HTTPException(500, f"Word → PPT error: {str(e)}")
 
     return FileResponse(output_path, filename="output.pptx")
 
@@ -226,7 +199,7 @@ async def ppt_to_word(file: UploadFile = File(...)):
         doc.save(output_path)
 
     except Exception as e:
-        raise HTTPException(500, f"PPT → Word error: {e}")
+        raise HTTPException(500, f"PPT → Word error: {str(e)}")
 
     return FileResponse(output_path, filename="output.docx")
 
@@ -243,41 +216,3 @@ async def generate_qr(data: str = Form(...)):
     img.save(output_path)
 
     return FileResponse(output_path, filename="qrcode.png")
-
-# =====================================================
-# PDF COMPRESSOR
-# =====================================================
-@app.post("/compress-pdf/")
-async def compress_pdf(file: UploadFile = File(...)):
-
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF allowed")
-
-    file_id = str(uuid.uuid4())
-    input_path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
-    output_path = os.path.join(PDF_DIR, f"{file_id}_compressed.pdf")
-
-    # Save uploaded file
-    with open(input_path, "wb") as f:
-        f.write(await file.read())
-
-    # Fixed compression level (optimized for most use cases)
-    quality = "/ebook"
-
-    try:
-        subprocess.run([
-            r"C:\Program Files\gs\gs10.07.0\bin\gswin64c.exe",
-            "-sDEVICE=pdfwrite",
-            "-dCompatibilityLevel=1.4",
-            f"-dPDFSETTINGS={quality}",
-            "-dNOPAUSE",
-            "-dQUIET",
-            "-dBATCH",
-            f"-sOutputFile={output_path}",
-            input_path
-        ], check=True)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Compression error: {str(e)}")
-
-    return FileResponse(output_path, filename="compressed.pdf")

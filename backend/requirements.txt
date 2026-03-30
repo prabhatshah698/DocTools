@@ -4,7 +4,6 @@ python-multipart
 python-docx
 pdfplumber
 python-pptx
+reportlab
 qrcode[pil]
 pillow
-lxml
-cryptography
