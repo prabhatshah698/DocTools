@@ -5,41 +5,73 @@ export default function WordToPdf() {
   const [file, setFile] = useState<File | null>(null);
   const [downloadLink, setDownloadLink] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (!file) return alert("Please select a .docx file first!");
+
     setLoading(true);
+    setProgress(0);
     setDownloadLink("");
 
     const formData = new FormData();
     formData.append("file", file);
 
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/word-to-pdf/`, {
-        method: "POST",
-        body: formData,
-      });
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${process.env.NEXT_PUBLIC_API_URL}/word-to-pdf/`);
+    xhr.responseType = "blob";
 
-      if (res.ok) {
-        const blob = await res.blob();
+    // Upload progress (0–50%)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 50);
+        setProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        let simulated = 50;
+
+        const interval = setInterval(() => {
+          simulated += 5;
+          setProgress(simulated);
+
+          if (simulated >= 100) {
+            clearInterval(interval);
+            setLoading(false);
+            setProgress(0);
+          }
+        }, 80);
+
+        const blob = new Blob([xhr.response], {
+          type: "application/pdf",
+        });
+
         const url = URL.createObjectURL(blob);
         setDownloadLink(url);
       } else {
-        const data = await res.json();
-        alert(data.detail || "Conversion failed!");
+        setLoading(false);
+        setProgress(0);
+        alert("Conversion failed!");
       }
-    } catch (error) {
-      console.log(error);
-      alert("Something went wrong!");
-    } finally {
+    };
+
+    xhr.onerror = () => {
       setLoading(false);
-    }
+      setProgress(0);
+      alert("Upload failed!");
+    };
+
+    xhr.send(formData);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-blue-100 px-4">
+
       <div className="w-full max-w-lg bg-white shadow-2xl rounded-2xl p-8 border border-gray-100">
 
+        {/* Header */}
         <h1 className="text-3xl font-bold text-center text-gray-800">
           Word → PDF Converter
         </h1>
@@ -47,12 +79,12 @@ export default function WordToPdf() {
           Upload your .docx file and convert it instantly
         </p>
 
+        {/* Upload Box */}
         <div className="mt-6 border-2 border-dashed border-indigo-300 rounded-xl p-6 text-center bg-indigo-50 hover:bg-indigo-100 transition">
-          
-          {/* ✅ FINAL FIX */}
+
           <input
             type="file"
-            accept=".docx"
+            accept=".doc,.docx"
             onChange={(e) => {
               if (!e.target.files?.length) return;
               setFile(e.target.files[0]);
@@ -67,6 +99,22 @@ export default function WordToPdf() {
           )}
         </div>
 
+        {/* Progress Bar */}
+        {loading && (
+          <div className="mt-5">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-indigo-500 h-2 rounded-full transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-center text-sm mt-2 text-gray-600">
+              Processing... {progress}%
+            </p>
+          </div>
+        )}
+
+        {/* Button */}
         <button
           onClick={handleUpload}
           disabled={loading}
@@ -87,6 +135,7 @@ export default function WordToPdf() {
           )}
         </button>
 
+        {/* Download */}
         {downloadLink && (
           <div className="mt-6 text-center">
             <p className="text-green-600 font-medium mb-2">
@@ -94,7 +143,7 @@ export default function WordToPdf() {
             </p>
             <a
               href={downloadLink}
-              download
+              download="converted.pdf"
               className="inline-block bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition"
             >
               Download PDF

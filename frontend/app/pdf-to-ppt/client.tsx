@@ -1,81 +1,165 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export default function PdfToPpt() {
   const [file, setFile] = useState<File | null>(null);
+  const [downloadLink, setDownloadLink] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
 
-  const handleUpload = async () => {
-    if (!file) {
-      alert("Please select a PDF file!");
-      return;
-    }
+  const handleUpload = () => {
+    if (!file) return alert("Please select a PDF file first!");
+
+    setLoading(true);
+    setProgress(0);
+    setDownloadLink("");
 
     const formData = new FormData();
     formData.append("file", file);
 
-    try {
-      setLoading(true);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${process.env.NEXT_PUBLIC_API_URL}/pdf-to-ppt/`);
+    xhr.responseType = "blob";
 
-      const res = await fetch("http://127.0.0.1:8000/pdf-to-ppt/", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        throw new Error("Conversion failed");
+    // Upload progress (0–50%)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 50);
+        setProgress(percent);
       }
+    };
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      setDownloadUrl(url);
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        let simulated = 50;
 
-    } catch (error) {
-      console.error(error);
-      alert("Something went wrong!");
-    } finally {
+        const interval = setInterval(() => {
+          simulated += 5;
+          setProgress(simulated);
+
+          if (simulated >= 100) {
+            clearInterval(interval);
+            setLoading(false);
+            setProgress(0);
+          }
+        }, 80);
+
+        const blob = new Blob([xhr.response], {
+          type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        });
+
+        const url = window.URL.createObjectURL(blob);
+        setDownloadLink(url);
+      } else {
+        setLoading(false);
+        setProgress(0);
+        alert("Conversion failed!");
+      }
+    };
+
+    xhr.onerror = () => {
       setLoading(false);
-    }
+      setProgress(0);
+      alert("Upload failed!");
+    };
+
+    xhr.send(formData);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="bg-white shadow-xl rounded-2xl p-6 w-full max-w-md space-y-4">
-        <h1 className="text-xl font-semibold text-center">
-          PDF to PPT Converter
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-100 via-white to-cyan-100 px-4">
+
+      <div className="w-full max-w-lg bg-white shadow-2xl rounded-2xl p-8 border border-gray-100">
+
+        {/* Heading */}
+        <h1 className="text-3xl font-bold text-center text-gray-800">
+          PDF → PPT Converter
         </h1>
+        <p className="text-center text-gray-500 mt-2 text-sm">
+          Convert PDF files into PowerPoint presentations
+        </p>
 
-        {/* ✅ Fixed Input */}
-        <input
-          type="file"
-          accept=".pdf"
-          onChange={(e) => {
-            if (!e.target.files?.length) return;
-            setFile(e.target.files[0]);
-          }}
-          className="w-full text-sm text-gray-700 border p-2 rounded"
-        />
+        {/* Back Link */}
+        <div className="text-center mt-3">
+          <Link href="/" className="text-sm text-blue-600 hover:underline">
+            ← Go to Home
+          </Link>
+        </div>
 
+        {/* Upload Box */}
+        <div className="mt-6 border-2 border-dashed border-teal-300 rounded-xl p-6 text-center bg-teal-50 hover:bg-teal-100 transition">
+
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={(e) => {
+              if (!e.target.files?.length) return;
+              setFile(e.target.files[0]);
+            }}
+            className="w-full text-sm text-gray-700"
+          />
+
+          {file && (
+            <p className="mt-3 text-sm text-gray-700">
+              📄 Selected: <span className="font-medium">{file.name}</span>
+            </p>
+          )}
+        </div>
+
+        {/* Progress Bar */}
+        {loading && (
+          <div className="mt-5">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-teal-500 h-2 rounded-full transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-center text-sm mt-2 text-gray-600">
+              Processing... {progress}%
+            </p>
+          </div>
+        )}
+
+        {/* Button */}
         <button
           onClick={handleUpload}
           disabled={loading}
-          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition"
+          className={`mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white font-semibold transition
+          ${
+            loading
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-gradient-to-r from-teal-500 to-cyan-500 hover:opacity-90"
+          }`}
         >
-          {loading ? "Converting..." : "Upload & Convert"}
+          {loading ? (
+            <>
+              <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-5 h-5"></span>
+              Converting...
+            </>
+          ) : (
+            "Convert to PPT"
+          )}
         </button>
 
-        {/* Download Button */}
-        {downloadUrl && (
-          <a
-            href={downloadUrl}
-            download="converted.pptx"
-            className="block text-center bg-green-500 text-white py-2 rounded hover:bg-green-600 transition"
-          >
-            Download PPT
-          </a>
+        {/* Download */}
+        {downloadLink && (
+          <div className="mt-6 text-center">
+            <p className="text-green-600 font-medium mb-2">
+              Conversion Successful 🎉
+            </p>
+            <a
+              href={downloadLink}
+              download="converted.pptx"
+              className="inline-block bg-teal-500 hover:bg-teal-600 text-white px-6 py-2 rounded-lg transition"
+            >
+              Download PPT
+            </a>
+          </div>
         )}
+
       </div>
     </div>
   );

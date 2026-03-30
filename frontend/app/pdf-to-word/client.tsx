@@ -6,35 +6,65 @@ export default function PdfToWord() {
   const [file, setFile] = useState<File | null>(null);
   const [downloadLink, setDownloadLink] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (!file) return alert("Please select a PDF file first!");
+
     setLoading(true);
+    setProgress(0);
     setDownloadLink("");
 
     const formData = new FormData();
     formData.append("file", file);
 
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pdf-to-word/`, {
-        method: "POST",
-        body: formData,
-      });
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${process.env.NEXT_PUBLIC_API_URL}/pdf-to-word/`);
+    xhr.responseType = "blob";
 
-      if (res.ok) {
-        const blob = await res.blob();
+    // Upload progress (0–50%)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 50);
+        setProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        let simulated = 50;
+
+        const interval = setInterval(() => {
+          simulated += 5;
+          setProgress(simulated);
+
+          if (simulated >= 100) {
+            clearInterval(interval);
+            setLoading(false);
+            setProgress(0);
+          }
+        }, 80);
+
+        const blob = new Blob([xhr.response], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        });
+
         const url = window.URL.createObjectURL(blob);
         setDownloadLink(url);
       } else {
-        const data = await res.json();
-        alert(data.detail || "Conversion failed!");
+        setLoading(false);
+        setProgress(0);
+        alert("Conversion failed!");
       }
-    } catch (error) {
-      console.log(error);
-      alert("Something went wrong!");
-    } finally {
+    };
+
+    xhr.onerror = () => {
       setLoading(false);
-    }
+      setProgress(0);
+      alert("Upload failed!");
+    };
+
+    xhr.send(formData);
   };
 
   return (
@@ -56,14 +86,13 @@ export default function PdfToWord() {
             href="/"
             className="text-sm text-blue-600 hover:underline"
           >
-            ← Go to Word → PDF Converter
+            ← Go to Home
           </Link>
         </div>
 
         {/* Upload Box */}
         <div className="mt-6 border-2 border-dashed border-green-300 rounded-xl p-6 text-center bg-green-50 hover:bg-green-100 transition">
 
-          {/* ✅ FIXED INPUT */}
           <input
             type="file"
             accept=".pdf"
@@ -80,6 +109,21 @@ export default function PdfToWord() {
             </p>
           )}
         </div>
+
+        {/* Progress Bar */}
+        {loading && (
+          <div className="mt-5">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-green-500 h-2 rounded-full transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-center text-sm mt-2 text-gray-600">
+              Processing... {progress}%
+            </p>
+          </div>
+        )}
 
         {/* Button */}
         <button
@@ -110,7 +154,7 @@ export default function PdfToWord() {
             </p>
             <a
               href={downloadLink}
-              download
+              download="converted.docx"
               className="inline-block bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition"
             >
               Download Word File
