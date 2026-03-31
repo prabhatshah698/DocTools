@@ -12,9 +12,14 @@ import qrcode
 import os
 import uuid
 import time
+import shutil
 from threading import Thread
 
 app = FastAPI()
+
+# ---------------- FIX: REMOVE OLD CONFLICT FOLDER ----------------
+if os.path.exists("pptx"):
+    shutil.rmtree("pptx")
 
 # ---------------- CORS ----------------
 app.add_middleware(
@@ -28,21 +33,20 @@ app.add_middleware(
 UPLOAD_DIR = "uploads"
 PDF_DIR = "pdfs"
 DOCX_DIR = "docx"
-PPTX_DIR = "pptx"
+PPTX_DIR = "pptx_files"   # ✅ FIXED
 QR_DIR = "qr_codes"
 
 for folder in [UPLOAD_DIR, PDF_DIR, DOCX_DIR, PPTX_DIR, QR_DIR]:
     os.makedirs(folder, exist_ok=True)
 
-# ---------------- TTL (30 min) ----------------
-FILE_TTL = 30 * 60  # 30 minutes
+# ---------------- TTL ----------------
+FILE_TTL = 30 * 60
 
 
-# ---------------- CLEANUP FUNCTION ----------------
+# ---------------- CLEANUP ----------------
 def cleanup_files():
     while True:
         now = time.time()
-
         folders = [UPLOAD_DIR, PDF_DIR, DOCX_DIR, PPTX_DIR, QR_DIR]
 
         for folder in folders:
@@ -50,22 +54,18 @@ def cleanup_files():
                 file_path = os.path.join(folder, filename)
 
                 if os.path.isfile(file_path):
-                    file_age = now - os.path.getmtime(file_path)
-
-                    if file_age > FILE_TTL:
+                    if now - os.path.getmtime(file_path) > FILE_TTL:
                         try:
                             os.remove(file_path)
-                            print("Deleted:", file_path)
-                        except Exception as e:
-                            print("Delete error:", e)
+                        except:
+                            pass
 
-        time.sleep(300)  # check every 5 minutes
+        time.sleep(300)
 
 
 @app.on_event("startup")
 def start_cleanup():
-    thread = Thread(target=cleanup_files, daemon=True)
-    thread.start()
+    Thread(target=cleanup_files, daemon=True).start()
 
 
 # ---------------- ROOT ----------------
@@ -79,7 +79,6 @@ def home():
 # =====================================================
 @app.post("/word-to-pdf/")
 async def word_to_pdf(file: UploadFile = File(...)):
-
     if not file.filename.endswith(".docx"):
         raise HTTPException(400, "Only DOCX allowed")
 
@@ -107,7 +106,7 @@ async def word_to_pdf(file: UploadFile = File(...)):
         c.save()
 
     except Exception as e:
-        raise HTTPException(500, f"Conversion error: {str(e)}")
+        raise HTTPException(500, str(e))
 
     return FileResponse(output_path, filename="output.pdf")
 
@@ -117,7 +116,6 @@ async def word_to_pdf(file: UploadFile = File(...)):
 # =====================================================
 @app.post("/pdf-to-word/")
 async def pdf_to_word(file: UploadFile = File(...)):
-
     file_id = str(uuid.uuid4())
     input_path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
     output_path = os.path.join(DOCX_DIR, f"{file_id}.docx")
@@ -137,7 +135,7 @@ async def pdf_to_word(file: UploadFile = File(...)):
         doc.save(output_path)
 
     except Exception as e:
-        raise HTTPException(500, f"PDF → Word error: {str(e)}")
+        raise HTTPException(500, str(e))
 
     return FileResponse(output_path, filename="output.docx")
 
@@ -147,7 +145,6 @@ async def pdf_to_word(file: UploadFile = File(...)):
 # =====================================================
 @app.post("/pdf-to-ppt/")
 async def pdf_to_ppt(file: UploadFile = File(...)):
-
     file_id = str(uuid.uuid4())
     input_path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
     output_path = os.path.join(PPTX_DIR, f"{file_id}.pptx")
@@ -163,7 +160,9 @@ async def pdf_to_ppt(file: UploadFile = File(...)):
                 text = page.extract_text()
                 if text:
                     slide = prs.slides.add_slide(prs.slide_layouts[1])
-                    box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(5))
+                    box = slide.shapes.add_textbox(
+                        Inches(1), Inches(1), Inches(8), Inches(5)
+                    )
                     tf = box.text_frame
 
                     for line in text.split("\n"):
@@ -174,7 +173,7 @@ async def pdf_to_ppt(file: UploadFile = File(...)):
         prs.save(output_path)
 
     except Exception as e:
-        raise HTTPException(500, f"PDF → PPT error: {str(e)}")
+        raise HTTPException(500, str(e))
 
     return FileResponse(output_path, filename="output.pptx")
 
@@ -184,7 +183,6 @@ async def pdf_to_ppt(file: UploadFile = File(...)):
 # =====================================================
 @app.post("/word-to-ppt/")
 async def word_to_ppt(file: UploadFile = File(...)):
-
     file_id = str(uuid.uuid4())
     input_path = os.path.join(UPLOAD_DIR, f"{file_id}.docx")
     output_path = os.path.join(PPTX_DIR, f"{file_id}.pptx")
@@ -205,7 +203,7 @@ async def word_to_ppt(file: UploadFile = File(...)):
         prs.save(output_path)
 
     except Exception as e:
-        raise HTTPException(500, f"Word → PPT error: {str(e)}")
+        raise HTTPException(500, str(e))
 
     return FileResponse(output_path, filename="output.pptx")
 
@@ -215,7 +213,6 @@ async def word_to_ppt(file: UploadFile = File(...)):
 # =====================================================
 @app.post("/ppt-to-word/")
 async def ppt_to_word(file: UploadFile = File(...)):
-
     file_id = str(uuid.uuid4())
     input_path = os.path.join(UPLOAD_DIR, f"{file_id}.pptx")
     output_path = os.path.join(DOCX_DIR, f"{file_id}.docx")
@@ -236,17 +233,16 @@ async def ppt_to_word(file: UploadFile = File(...)):
         doc.save(output_path)
 
     except Exception as e:
-        raise HTTPException(500, f"PPT → Word error: {str(e)}")
+        raise HTTPException(500, str(e))
 
     return FileResponse(output_path, filename="output.docx")
 
 
 # =====================================================
-# QR CODE GENERATOR
+# QR CODE
 # =====================================================
 @app.post("/generate-qr/")
 async def generate_qr(data: str = Form(...)):
-
     file_id = str(uuid.uuid4())
     output_path = os.path.join(QR_DIR, f"{file_id}.png")
 
