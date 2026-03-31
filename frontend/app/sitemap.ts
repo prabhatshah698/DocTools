@@ -1,10 +1,10 @@
 export default function sitemap() {
   return [
-    { url: "https://your-domain.com" },
-    { url: "https://your-domain.com/word-to-pdf" },
-    { url: "https://your-domain.com/pdf-to-word" },
-    { url: "https://your-domain.com/ppt-to-pdf" },
-    { url: "https://your-domain.com/pdf-compressor" },
-    { url: "https://your-domain.com/qr-generator" },
+    { url: "https://doc-tools-frontend.vercel.app" },
+    { url: "https://doc-tools-frontend.vercel.app/word-to-pdf" },
+    { url: "https://doc-tools-frontend.vercel.app/pdf-to-word" },
+    { url: "https://doc-tools-frontend.vercel.app/ppt-to-pdf" },
+    { url: "https://doc-tools-frontend.vercel.app/pdf-compressor" },
+    { url: "https://doc-tools-frontend.vercel.app/qr-generator" },
   ];
 }
