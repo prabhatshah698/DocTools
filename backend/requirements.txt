@@ -2,8 +2,9 @@ fastapi
 uvicorn[standard]
 python-multipart
 python-docx
-pdfplumber
-python-pptx
+pdfplumber==0.10.3
+pdfminer.six
+python-pptx==0.6.23
 reportlab
 qrcode[pil]
 pillow
