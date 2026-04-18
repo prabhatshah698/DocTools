@@ -272,16 +272,16 @@ async def compress_pdf(file: UploadFile = File(...)):
 
     try:
         subprocess.run([
-            r"C:\Program Files\gs\gs10.07.0\bin",  # ✅ YOUR PATH
-            "-sDEVICE=pdfwrite",
-            "-dCompatibilityLevel=1.4",
-            "-dPDFSETTINGS=/ebook",
-            "-dNOPAUSE",
-            "-dQUIET",
-            "-dBATCH",
-            f"-sOutputFile={output_path}",
-            input_path
-        ], check=True)
+    r"C:\Program Files\gs\gs10.07.0\bin\gswin64c.exe",
+    "-sDEVICE=pdfwrite",
+    "-dCompatibilityLevel=1.4",
+    "-dPDFSETTINGS=/ebook",
+    "-dNOPAUSE",
+    "-dQUIET",
+    "-dBATCH",
+    f"-sOutputFile={output_path}",
+    input_path
+], check=True)
 
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Compression failed: {e}")
