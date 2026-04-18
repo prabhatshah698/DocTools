@@ -22,7 +22,7 @@ export default function PdfCompressor() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/compress-pdf/`,
+        `${process.env.NEXT_PUBLIC_API_URL}/pdf-compressor/`,
         {
           method: "POST",
           body: formData,

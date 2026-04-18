@@ -250,3 +250,36 @@ async def generate_qr(data: str = Form(...)):
     img.save(output_path)
 
     return FileResponse(output_path, filename="qrcode.png")
+
+import subprocess  # ✅ must
+
+@app.post("/pdf-compressor/")
+async def compress_pdf(file: UploadFile = File(...)):
+
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF allowed")
+
+    file_id = str(uuid.uuid4())
+    input_path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
+    output_path = os.path.join(PDF_DIR, f"{file_id}_compressed.pdf")
+
+    with open(input_path, "wb") as f:
+        f.write(await file.read())
+
+    try:
+        subprocess.run([
+            r"C:\Program Files\gs\gs10.07.0\bin\gswin64c.exe",  # ✅ YOUR PATH
+            "-sDEVICE=pdfwrite",
+            "-dCompatibilityLevel=1.4",
+            "-dPDFSETTINGS=/ebook",
+            "-dNOPAUSE",
+            "-dQUIET",
+            "-dBATCH",
+            f"-sOutputFile={output_path}",
+            input_path
+        ], check=True)
+
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Compression failed: {e}")
+
+    return FileResponse(output_path, filename="compressed.pdf")
