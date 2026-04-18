@@ -251,6 +251,10 @@ async def generate_qr(data: str = Form(...)):
 
     return FileResponse(output_path, filename="qrcode.png")
 
+# =====================================================
+# PDF Compressor
+# =====================================================
+
 import subprocess  # ✅ must
 
 @app.post("/pdf-compressor/")
@@ -268,7 +272,7 @@ async def compress_pdf(file: UploadFile = File(...)):
 
     try:
         subprocess.run([
-            r"C:\Program Files\gs\gs10.07.0\bin\gswin64c.exe",  # ✅ YOUR PATH
+            r"C:\Program Files\gs\gs10.07.0\bin",  # ✅ YOUR PATH
             "-sDEVICE=pdfwrite",
             "-dCompatibilityLevel=1.4",
             "-dPDFSETTINGS=/ebook",
